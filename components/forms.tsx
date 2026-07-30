@@ -286,13 +286,18 @@ export function IncomeForm({ income, onSuccess }: IncomeFormProps) {
 
     // Validación: la fecha debe estar dentro del periodo actual
     if (currentPeriod) {
-      const periodStart = new Date(currentPeriod.startDate);
-      const periodEnd = new Date(currentPeriod.endDate);
-      // Elimina la hora para la comparación
+      // Corrección: la fecha final del periodo puede traer hora 00:00 UTC, así que compara usando las fechas normalizadas a local (sin hora)
+      // Establece explícitamente las fechas en local
+      const periodStart = new Date(currentPeriod.startDate + "T00:00:00");
+      const periodEnd = new Date(currentPeriod.endDate + "T00:00:00");
+      // Elimina la hora para la comparación (local)
       const inputDateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
       const startDateOnly = new Date(periodStart.getFullYear(), periodStart.getMonth(), periodStart.getDate());
       const endDateOnly = new Date(periodEnd.getFullYear(), periodEnd.getMonth(), periodEnd.getDate());
-      if (inputDateOnly < startDateOnly || inputDateOnly > endDateOnly) {
+      if (
+        inputDateOnly.getTime() < startDateOnly.getTime() ||
+        inputDateOnly.getTime() > endDateOnly.getTime()
+      ) {
         Alert.alert(
           'Error',
           `La fecha del ingreso debe estar en las fechas del período actual (${formatDate(new Date(`${currentPeriod.startDate}T12:00:00`))} al ${formatDate(new Date(`${currentPeriod.endDate}T12:00:00`))}).`
