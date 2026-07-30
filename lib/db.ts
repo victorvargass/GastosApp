@@ -29,11 +29,15 @@ const DEFAULT_CATEGORIES: NewCategory[] = [
 
 let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
-async function getDb(): Promise<SQLite.SQLiteDatabase> {
+export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
   if (!dbPromise) {
     dbPromise = SQLite.openDatabaseAsync(DATABASE_NAME);
   }
   return dbPromise;
+}
+
+async function getDb(): Promise<SQLite.SQLiteDatabase> {
+  return getDatabase();
 }
 
 async function needsSchemaMigration(
@@ -1039,4 +1043,23 @@ export async function getPeriodHistory(): Promise<PeriodHistory[]> {
   });
 
   return result;
+}
+
+/**
+ * Closes the cached SQLite connection. Used by the restore workflow before
+ * replacing the database file.
+ */
+export async function closeDatabase(): Promise<void> {
+  if (!dbPromise) return;
+  const db = await dbPromise;
+  await db.closeAsync();
+  dbPromise = null;
+}
+
+/**
+ * Drops the cached connection without touching the database file.
+ * The next database access will open it again.
+ */
+export function resetDatabaseConnection(): void {
+  dbPromise = null;
 }
