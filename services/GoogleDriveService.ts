@@ -18,16 +18,17 @@ export class GoogleDriveService {
 
   private async request(
     url: string,
-    init: FetchRequestInit = {}
+    init: Omit<FetchRequestInit, 'headers'> = {}
   ): Promise<Response> {
     const accessToken = await this.getAccessToken();
 
-    const headers = new Headers(init.headers);
-    headers.set('Authorization', `Bearer ${accessToken}`);
-
     const response = await fetch(url, {
       ...init,
-      headers,
+      // expo/fetch expects a serializable header map on Android. The browser
+      // Headers class is not accepted by its native bridge.
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
     });
 
     if (!response.ok) {
