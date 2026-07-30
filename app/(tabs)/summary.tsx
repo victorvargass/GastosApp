@@ -101,9 +101,6 @@ export default function SummaryScreen() {
     }));
   }, [filteredPeriods, categories]);
 
-  console.log(stackData, categories)
-
-
   const chartMaxValue = useMemo(() => {
     const max = Math.max(
       ...stackData.map(d => d.stacks.reduce((sum, s) => sum + s.value, 0))
@@ -174,75 +171,79 @@ export default function SummaryScreen() {
           <ThemedText type="title">Histórico</ThemedText>
         </ThemedView>
 
-        <ThemedView style={styles.card}>
-          <ThemedText style={styles.label}>Año</ThemedText>
-          <YearPicker />
+        {stackData.length > 0 && categories.length > 0 ? (
+          <ThemedView style={styles.card}>
+            <ThemedText style={styles.label}>Año</ThemedText>
+            <YearPicker />
 
-          {/* Mostrar total histórico gastado en formato CLP */}
-          <View style={{ marginTop: 2 }}>
-            <ThemedText style={{ fontWeight: '600', fontSize: 15, color: colors.text }}>
-              Total gastado: <Text style={{ fontWeight: 'bold' }}>{formatCLP(totalGastado)}</Text>
-            </ThemedText>
-          </View>
-
-          {stackData.length > 0 && categories.length > 0 ? (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <BarChart
-                stackData={stackData}
-                width={chartWidth}
-                height={320}
-                barWidth={barWidth}
-                spacing={spacing}
-                noOfSections={5}
-                roundedTop
-                isAnimated
-                onPress={(item: any) => {
-                  const period = filteredPeriods[item.periodIndex];
-                  setSelectedPeriod(period);
-                  setShowPeriodModal(true);
-                }}
-                yAxisTextStyle={{
-                  color: colors.text,
-                  fontSize: 10,
-                }}
-                xAxisLabelTextStyle={{
-                  color: colors.text,
-                  fontSize: 9,
-                }}
-                rulesColor="#ddd"
-                yAxisLabelPrefix="$ "
-                yAxisLabelWidth={60}
-                maxValue={chartMaxValue}
-                yAxisLabelTexts={(() => {
-                  const step = chartMaxValue / 5;
-                
-                  return [...Array(6).keys()].map(i => {
-                    return formatCLP(step * i);
-                  });
-                })()}
-              />
-            </ScrollView>
-          ) : (
-            <ThemedText>No hay datos históricos.</ThemedText>
-          )}
-
-          {categories.length > 0 && (
-            <View style={styles.categoryContainer}>
-              <ThemedText style={styles.label}>Categorías</ThemedText>
-              {categories.map(category => (
-                <View key={category.categoryId} style={styles.categoryRow}>
-                  <View
-                    style={[
-                      styles.colorDot,
-                      { backgroundColor: category.categoryColor }
-                    ]}
-                  />
-                  <ThemedText>{category.categoryName}</ThemedText>
-                </View>
-              ))}
+            {/* Mostrar total histórico gastado en formato CLP */}
+            <View style={{ marginTop: 2 }}>
+              <ThemedText style={{ fontWeight: '600', fontSize: 15, color: colors.text }}>
+                Total gastado año: <Text style={{ fontWeight: 'bold' }}>{formatCLP(totalGastado)}</Text>
+              </ThemedText>
             </View>
-          )}
-        </ThemedView>
+
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <BarChart
+                  stackData={stackData}
+                  width={chartWidth}
+                  height={320}
+                  barWidth={barWidth}
+                  spacing={spacing}
+                  noOfSections={5}
+                  roundedTop
+                  isAnimated
+                  onPress={(item: any) => {
+                    const period = filteredPeriods[item.periodIndex];
+                    setSelectedPeriod(period);
+                    setShowPeriodModal(true);
+                  }}
+                  yAxisTextStyle={{
+                    color: colors.text,
+                    fontSize: 10,
+                  }}
+                  xAxisLabelTextStyle={{
+                    color: colors.text,
+                    fontSize: 9,
+                  }}
+                  rulesColor="#ddd"
+                  yAxisLabelPrefix="$ "
+                  yAxisLabelWidth={60}
+                  maxValue={chartMaxValue}
+                  yAxisLabelTexts={(() => {
+                    const step = chartMaxValue / 5;
+                  
+                    return [...Array(6).keys()].map(i => {
+                      return formatCLP(step * i);
+                    });
+                  })()}
+                />
+              </ScrollView>
+
+            {categories.length > 0 && (
+              <View style={styles.categoryContainer}>
+                <ThemedText style={styles.label}>Categorías</ThemedText>
+                {categories.map(category => (
+                  <View key={category.categoryId} style={styles.categoryRow}>
+                    <View
+                      style={[
+                        styles.colorDot,
+                        { backgroundColor: category.categoryColor }
+                      ]}
+                    />
+                    <ThemedText>{category.categoryName}</ThemedText>
+                  </View>
+                ))}
+              </View>
+            )}
+          </ThemedView>
+        ) : (
+          <ThemedView style={styles.card}>
+            <View style={styles.center}>
+              <ThemedText>Aún no hay datos históricos.</ThemedText>
+            </View>
+          </ThemedView>
+        )}
       </ScrollView>
 
       <HistoricalPeriodModal
@@ -310,4 +311,10 @@ const styles = StyleSheet.create({
     height: 14,
     borderRadius: 7,
   },
+  center: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    paddingVertical: 24
+  }
 });
