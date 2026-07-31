@@ -103,16 +103,42 @@ async function needsSchemaMigration(
       `
     );
 
+  const settingsColumns =
+    await db.getAllAsync<{
+      name: string;
+    }>('PRAGMA table_info(settings)');
+
+  const currentPeriodColumn = settingsColumns.find(
+    c => c.name === 'current_period_id'
+  );
+
   return (
     !hasUniqueColor ||
     categoryColumn?.notnull !== 0 ||
     !expensePeriodColumn ||
     !incomePeriodColumn ||
-    !settingsTable
+    !settingsTable ||
+    !currentPeriodColumn
   );
 }
 
 async function migrateSchema(db: SQLite.SQLiteDatabase): Promise<void> {
+  const settingsColumns =
+    await db.getAllAsync<{
+      name: string;
+    }>('PRAGMA table_info(settings)');
+
+  const canCopyCurrentPeriod = settingsColumns.some(
+    column => column.name === 'current_period_id'
+  );
+
+  const copySettings = canCopyCurrentPeriod
+    ? `
+      INSERT INTO settings_new (id, current_period_id)
+      SELECT id, current_period_id FROM settings;
+    `
+    : '';
+
   await db.execAsync(`
     PRAGMA foreign_keys = OFF;
 
@@ -163,6 +189,8 @@ async function migrateSchema(db: SQLite.SQLiteDatabase): Promise<void> {
     SELECT id, start_date, end_date FROM periods
     WHERE EXISTS (SELECT 1 FROM sqlite_master WHERE type='table' AND name='periods');
 
+    ${copySettings}
+
     INSERT INTO categories_new (id, name, color, period_limit)
     SELECT id, name, color, period_limit FROM categories;
 
@@ -183,14 +211,6 @@ async function migrateSchema(db: SQLite.SQLiteDatabase): Promise<void> {
     ALTER TABLE incomes_new RENAME TO incomes;
     ALTER TABLE periods_new RENAME TO periods;
     ALTER TABLE settings_new RENAME TO settings;
-
-    CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(date);
-    CREATE INDEX IF NOT EXISTS idx_expenses_category ON expenses(category_id);
-    CREATE INDEX IF NOT EXISTS idx_expenses_period ON expenses(period_id);
-    CREATE INDEX IF NOT EXISTS idx_incomes_date ON incomes(date);
-    CREATE INDEX IF NOT EXISTS idx_incomes_period ON incomes(period_id);
-    CREATE INDEX IF NOT EXISTS idx_expenses_period_category ON expenses(period_id, category_id);
-    CREATE INDEX IF NOT EXISTS idx_expenses_period_date ON expenses(period_id, date);
 
     PRAGMA foreign_keys = ON;
   `);
@@ -276,11 +296,22 @@ export async function initDatabase(): Promise<void> {
       FOREIGN KEY(period_id) REFERENCES periods(id)
     );
 
+  `);
+
+  // Existing databases can have an older expenses/incomes schema. Migrate it
+  // before creating indexes or running any query that requires period_id.
+  if (await needsSchemaMigration(db)) {
+    await migrateSchema(db);
+  }
+
+  await db.execAsync(`
     CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(date);
     CREATE INDEX IF NOT EXISTS idx_expenses_category ON expenses(category_id);
     CREATE INDEX IF NOT EXISTS idx_expenses_period ON expenses(period_id);
     CREATE INDEX IF NOT EXISTS idx_incomes_date ON incomes(date);
     CREATE INDEX IF NOT EXISTS idx_incomes_period ON incomes(period_id);
+    CREATE INDEX IF NOT EXISTS idx_expenses_period_category ON expenses(period_id, category_id);
+    CREATE INDEX IF NOT EXISTS idx_expenses_period_date ON expenses(period_id, date);
 
     INSERT OR IGNORE INTO periods (id, start_date, end_date)
     VALUES (
@@ -295,10 +326,6 @@ export async function initDatabase(): Promise<void> {
       1
     );
   `);
-
-  if (await needsSchemaMigration(db)) {
-    await migrateSchema(db);
-  }
 
   const row = await db.getFirstAsync<{ count: number }>(
     'SELECT COUNT(*) as count FROM categories'
