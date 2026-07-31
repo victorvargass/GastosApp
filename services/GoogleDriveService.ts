@@ -24,11 +24,8 @@ export class GoogleDriveService {
 
     const response = await fetch(url, {
       ...init,
-      // expo/fetch expects a serializable header map on Android. The browser
-      // Headers class is not accepted by its native bridge.
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
+      // expo/fetch's Android bridge expects headers as name/value pairs.
+      headers: [['Authorization', `Bearer ${accessToken}`]],
     });
 
     if (!response.ok) {
@@ -70,40 +67,6 @@ export class GoogleDriveService {
 
     const backups = await this.listBackups();
 
-    // Reuse the existing Drive file when possible. This avoids a delete-then-
-    // upload gap and guarantees one logical backup per Google account.
-    if (backups.length > 0) {
-      const primary = backups[0];
-
-      const accessToken = await this.getAccessToken();
-      const response = await fetch(
-        `${UPLOAD_API}/${primary.id}?uploadType=media&fields=id,name,modifiedTime`,
-        {
-          method: 'PATCH',
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            'Content-Type': 'application/x-sqlite3',
-          },
-          // Expo File implements Blob. Sending it directly avoids creating a
-          // Blob from Uint8Array, which React Native does not support.
-          body: file,
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(
-          `No se pudo actualizar el respaldo (${response.status}).`
-        );
-      }
-
-      // Remove any old duplicates left by previous versions of the app.
-      for (const duplicate of backups.slice(1)) {
-        await this.deleteFile(duplicate.id);
-      }
-
-      return (await response.json()) as DriveBackup;
-    }
-
     const metadata = {
       name: BACKUP_NAME,
       parents: ['appDataFolder'],
@@ -127,7 +90,14 @@ export class GoogleDriveService {
       }
     );
 
-    return (await response.json()) as DriveBackup;
+    const uploaded = (await response.json()) as DriveBackup;
+
+    // Upload before cleaning up: a failed upload must never leave the user
+    // without their last valid backup. Cleanup is best effort because any
+    // remaining older copy is harmless—the latest one is restored.
+    await Promise.allSettled(backups.map((backup) => this.deleteFile(backup.id)));
+
+    return uploaded;
   }
 
   async downloadDatabase(): Promise<File | null> {
