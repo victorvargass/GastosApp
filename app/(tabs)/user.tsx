@@ -1,20 +1,22 @@
+import React from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  View,
+    ActivityIndicator,
+    Alert,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { GoogleLogo } from '@/components/google-logo';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useGoogle } from '@/hooks/useGoogle';
 
+// Utils
 function formatBackupDate(date: string | undefined): string {
   if (!date) return 'Nunca';
-
   const parsed = new Date(date);
   if (Number.isNaN(parsed.getTime())) return 'Desconocido';
 
@@ -24,15 +26,24 @@ function formatBackupDate(date: string | undefined): string {
   });
 }
 
+// Components
+type ActionButtonProps = {
+  title: string;
+  onPress: () => void;
+  disabled?: boolean;
+  style?: any;
+  textStyle?: any;
+  icon?: React.ReactNode;
+};
+
 function ActionButton({
   title,
   onPress,
   disabled,
-}: {
-  title: string;
-  onPress: () => void;
-  disabled?: boolean;
-}) {
+  style,
+  textStyle,
+  icon,
+}: ActionButtonProps) {
   return (
     <Pressable
       disabled={disabled}
@@ -41,13 +52,18 @@ function ActionButton({
         styles.button,
         disabled && styles.buttonDisabled,
         pressed && !disabled && styles.buttonPressed,
+        style,
       ]}
     >
-      <ThemedText style={styles.buttonText}>{title}</ThemedText>
+      {icon}
+      <ThemedText style={[styles.buttonText, textStyle]}>
+        {title}
+      </ThemedText>
     </Pressable>
   );
 }
 
+// Main screen
 export default function UserScreen() {
   const {
     user,
@@ -62,6 +78,7 @@ export default function UserScreen() {
     logout,
   } = useGoogle();
 
+  // Actions
   const runBackup = async () => {
     try {
       await backup();
@@ -98,6 +115,7 @@ export default function UserScreen() {
     await logout();
   };
 
+  // Loading
   if (isLoading) {
     return (
       <SafeAreaView style={styles.safe} edges={['top']}>
@@ -109,6 +127,7 @@ export default function UserScreen() {
     );
   }
 
+  // Main content
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView contentContainerStyle={styles.scroll}>
@@ -121,20 +140,20 @@ export default function UserScreen() {
             <>
               <ThemedText type="subtitle">Google Drive</ThemedText>
               <ThemedText style={styles.description}>
-                Conecta tu cuenta de Google para guardar y restaurar tus gastos
+                Conecta tu cuenta de Google para guardar y restaurar tu información
                 de forma segura.
               </ThemedText>
-
               <ActionButton
                 title={isWorking ? 'Conectando...' : 'Conectar con Google'}
                 disabled={isWorking}
-                onPress={async () => {
-                  try {
-                    await login();
-                  } catch {
+                onPress={() => {
+                  login().catch(() => {
                     // El mensaje se muestra debajo.
-                  }
+                  });
                 }}
+                style={styles.googleButtonStyle}
+                textStyle={styles.googleButtonTextStyle}
+                icon={<GoogleLogo />}
               />
             </>
           ) : (
@@ -145,7 +164,6 @@ export default function UserScreen() {
                     {(user?.name?.[0] ?? 'G').toUpperCase()}
                   </ThemedText>
                 </View>
-
                 <View style={styles.profileInfo}>
                   <ThemedText type="subtitle">
                     {user?.name ?? 'Usuario Google'}
@@ -155,34 +173,29 @@ export default function UserScreen() {
                   </ThemedText>
                 </View>
               </View>
-
               <View style={styles.infoRow}>
-                <ThemedText style={styles.infoLabel}>☁️ Estado</ThemedText>
-                <ThemedText style={styles.connected}>Conectado</ThemedText>
+                <ThemedText style={styles.infoLabel}>Estado</ThemedText>
+                <ThemedText style={styles.connected}>Conectado con Google</ThemedText>
               </View>
-
               <View style={styles.infoRow}>
-                <ThemedText style={styles.infoLabel}>📅 Último respaldo</ThemedText>
+                <ThemedText style={styles.infoLabel}>Último respaldo</ThemedText>
                 <ThemedText style={styles.infoValue}>
                   {formatBackupDate(lastBackup?.modifiedTime)}
                 </ThemedText>
               </View>
-
               <View style={styles.actions}>
                 <ActionButton
-                  title={isWorking ? 'Respaldando...' : '⬆️ Respaldar'}
+                  title={isWorking ? 'Respaldando...' : 'Respaldar'}
                   disabled={isWorking}
                   onPress={runBackup}
                 />
-
                 <ActionButton
-                  title={isWorking ? 'Restaurando...' : '🔄 Restaurar'}
+                  title={isWorking ? 'Restaurando...' : 'Restaurar'}
                   disabled={isWorking || !lastBackup}
                   onPress={confirmRestore}
                 />
-
                 <ActionButton
-                  title="🚪 Cerrar sesión"
+                  title="Cerrar sesión"
                   disabled={isWorking}
                   onPress={runLogout}
                 />
@@ -197,10 +210,15 @@ export default function UserScreen() {
             </View>
           )}
 
-          {!!error && (
-            <ThemedText style={styles.error}>
-              {error}
-            </ThemedText>
+          {error && (
+            <>
+              {Alert.alert(
+                'Error',
+                error,
+                [{ text: 'OK' }],
+                { cancelable: true }
+              )}
+            </>
           )}
         </ThemedView>
       </ScrollView>
@@ -208,6 +226,7 @@ export default function UserScreen() {
   );
 }
 
+// Styles
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
@@ -306,5 +325,24 @@ const styles = StyleSheet.create({
   },
   error: {
     lineHeight: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    textAlign: 'center',
+  },
+  googleButtonStyle: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#ccc',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: 5,
+    marginTop: 10,
+  },
+  googleButtonTextStyle: {
+    color: '#444',
+    fontWeight: '600',
+    fontSize: 16,
   },
 });
